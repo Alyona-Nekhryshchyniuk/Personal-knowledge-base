@@ -1,12 +1,20 @@
 'use client';
 
 import { Chip, ChipProps } from '@mui/material';
-import { isDueToday, isOverdue, isInNext7Days } from '@/lib/dates';
+import { isDueToday, isOverdue, isInNext7Days, getTodayUTC } from '@/lib/dates';
+import { addDays } from 'date-fns';
 
 interface ReviewBadgeProps {
   nextReviewDate?: Date | null;
   status?: string;
   size?: 'small' | 'medium';
+}
+
+function getDaysUntilReview(nextReviewDate: Date): number {
+  const today = getTodayUTC();
+  const reviewDate = new Date(nextReviewDate);
+  const diffTime = reviewDate.getTime() - today.getTime();
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 }
 
 export function ReviewBadge({ nextReviewDate, status = 'Active', size = 'small' }: ReviewBadgeProps) {
@@ -66,9 +74,11 @@ export function ReviewBadge({ nextReviewDate, status = 'Active', size = 'small' 
   }
 
   if (isInNext7Days(dateString, status)) {
+    const daysUntil = getDaysUntilReview(dateString);
+    const label = daysUntil === 1 ? 'Due tomorrow' : `Due in ${daysUntil} days`;
     return (
       <Chip
-        label={`Due in 7 days (${dateString.toLocaleDateString()})`}
+        label={label}
         size={size}
         sx={{
           backgroundColor: '#fff3cd',
