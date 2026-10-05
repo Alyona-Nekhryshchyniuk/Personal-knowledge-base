@@ -103,12 +103,16 @@ export function buildNotificationPayload(note: any): NotificationPayload {
   const nextReview = new Date(note.nextReviewDate);
   const daysOverdue = calculateDaysOverdue(nextReview, today);
 
+  const dateStr = typeof note.nextReviewDate === 'string'
+    ? note.nextReviewDate.split('T')[0]
+    : nextReview.toISOString().split('T')[0];
+
   return {
-    id: `${note.id}-${nextReview.getTime()}`,
+    id: `${note.id}-${dateStr}`,
     noteId: note.id,
     title: note.title,
     collection: note.collection.name,
-    nextReviewDate: nextReview.toISOString().split('T')[0],
+    nextReviewDate: dateStr,
     overdue: isOverdue(nextReview, note.status),
     daysOverdue,
     dueToday: isDueToday(nextReview, note.status),

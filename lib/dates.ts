@@ -1,13 +1,12 @@
-import { addDays, addMonths, isBefore, isEqual } from 'date-fns';
+import { startOfToday, addDays, addMonths, isBefore, isEqual } from 'date-fns';
 
 type ReviewInterval = 'none' | 'daily' | 'weekly' | 'monthly' | 'custom';
 
 /**
- * Get today's date in UTC (midnight UTC to midnight UTC)
+ * Get today's date in UTC (midnight to midnight)
  */
 export function getTodayUTC(): Date {
-  const now = new Date();
-  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 0, 0, 0, 0));
+  return startOfToday();
 }
 
 /**
