@@ -40,6 +40,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const handleMessage = useCallback((data: any) => {
     if (data.type === 'notification_batch') {
       const newReminders = data.notifications || [];
+      console.log('[Notifications] Received batch:', newReminders.length, 'reminders');
 
       // Show toast for newly received notifications
       for (const reminder of newReminders) {
@@ -50,6 +51,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
             ? `Overdue by ${reminder.daysOverdue} day${reminder.daysOverdue > 1 ? 's' : ''}`
             : 'Due today';
 
+          console.log('[Notifications] Showing toast:', reminder.title);
           toast.info(`📚 Review: ${reminder.title}`, {
             description: `${statusText} in ${reminder.collection}`,
             duration: 5000,
@@ -66,6 +68,11 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     handleMessage,
     session ? handleConnectionFailure : undefined
   );
+  const sendRef = useRef(send);
+
+  useEffect(() => {
+    sendRef.current = send;
+  }, [send]);
 
   // Clear on logout
   useEffect(() => {
@@ -76,12 +83,12 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
-  // Subscribe on login
+  // Subscribe on login (only once when session is first available)
   useEffect(() => {
     if (session) {
-      send({ type: 'subscribe', interval: 30000 });
+      sendRef.current({ type: 'subscribe', interval: 30000 });
     }
-  }, [send, session]);
+  }, [session]);
 
   const markAsRead = useCallback((notificationId: string) => {
     setReadIds((prev) => new Set(prev).add(notificationId));
