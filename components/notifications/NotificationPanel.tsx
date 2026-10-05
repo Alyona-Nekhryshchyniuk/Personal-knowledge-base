@@ -168,6 +168,7 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
                         onClick={(e) => {
                           e.stopPropagation();
                           markAsRead(notification.id);
+                          clearNotification(notification.id);
                         }}
                       >
                         Mark Read

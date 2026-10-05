@@ -85,7 +85,8 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
 
   const markAsRead = useCallback((notificationId: string) => {
     setReadIds((prev) => new Set(prev).add(notificationId));
-  }, []);
+    send({ type: 'ack', notificationId });
+  }, [send]);
 
   const clearNotification = useCallback((notificationId: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));
