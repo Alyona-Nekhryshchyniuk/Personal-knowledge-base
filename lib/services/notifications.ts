@@ -28,6 +28,14 @@ export async function getDueNotifications(userId: string): Promise<NotificationP
       status: 'Active',
       reviewInterval: { not: 'none' },
       nextReviewDate: { lte: today },
+      NOT: {
+        notificationLog: {
+          some: {
+            userId,
+            ackedAt: { not: null },
+          },
+        },
+      },
     },
     include: {
       collection: { select: { name: true } },
@@ -59,6 +67,14 @@ export async function getAllNotifications(userId: string): Promise<NotificationP
         lte: in7Days,
         gte: today,
       },
+      NOT: {
+        notificationLog: {
+          some: {
+            userId,
+            ackedAt: { not: null },
+          },
+        },
+      },
     },
     include: {
       collection: { select: { name: true } },
@@ -85,6 +101,14 @@ export async function getOverdueNotifications(userId: string): Promise<Notificat
       status: 'Active',
       reviewInterval: { not: 'none' },
       nextReviewDate: { lt: today },
+      NOT: {
+        notificationLog: {
+          some: {
+            userId,
+            ackedAt: { not: null },
+          },
+        },
+      },
     },
     include: {
       collection: { select: { name: true } },
@@ -162,6 +186,14 @@ export async function getNewlyDueNotifications(
       },
       updatedAt: {
         gte: sinceDate,
+      },
+      NOT: {
+        notificationLog: {
+          some: {
+            userId,
+            ackedAt: { not: null },
+          },
+        },
       },
     },
     include: {

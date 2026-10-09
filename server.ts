@@ -28,20 +28,56 @@ app.prepare().then(() => {
   const wss = new WebSocketServer({ noServer: true });
 
   server.on('upgrade', async (req, socket, head) => {
-    if (req.url === '/api/ws') {
+    let pathname: string;
+
+    try {
+      pathname = new URL(
+        req.url || '/',
+        `http://${req.headers.host || 'localhost'}`
+      ).pathname;
+    } catch {
+      socket.destroy();
+      return;
+    }
+
+    // Leave Next.js internal upgrade paths alone.
+    if (pathname !== '/api/ws') {
+      return;
+    }
+
+    console.log('[WS] WebSocket upgrade request received');
+
+    try {
       const session = await authenticateConnection(req);
 
       if (!session?.user?.id) {
-        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
-        socket.destroy();
+        if (!socket.destroyed) {
+          socket.write(
+            'HTTP/1.1 401 Unauthorized\r\n' +
+            'Connection: close\r\n\r\n'
+          );
+          socket.destroy();
+        }
         return;
       }
+
+      if (socket.destroyed) return;
+
+      console.log('[WS] Connection authorized');
 
       wss.handleUpgrade(req, socket, head, (ws) => {
         wss.emit('connection', ws, session);
       });
-    } else {
-      socket.destroy();
+    } catch (error) {
+      console.error('[WS] Upgrade/authentication failed:', error);
+
+      if (!socket.destroyed) {
+        socket.write(
+          'HTTP/1.1 500 Internal Server Error\r\n' +
+          'Connection: close\r\n\r\n'
+        );
+        socket.destroy();
+      }
     }
   });
 

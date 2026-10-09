@@ -165,8 +165,17 @@ export function NotificationPanel({ open, onClose }: NotificationPanelProps) {
                         size="small"
                         startIcon={<CheckIcon />}
                         variant="outlined"
-                        onClick={(e) => {
+                        onClick={async (e) => {
                           e.stopPropagation();
+                          try {
+                            await fetch('/api/notifications/ack', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ noteId: notification.noteId }),
+                            });
+                          } catch (error) {
+                            console.error('[Notification] Failed to mark as read:', error);
+                          }
                           markAsRead(notification.id);
                           clearNotification(notification.id);
                         }}

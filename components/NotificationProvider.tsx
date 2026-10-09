@@ -2,19 +2,10 @@
 
 import { createContext, useContext, ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { useSession } from 'next-auth/react';
-import { useWebSocket } from '@/hooks/useWebSocket';
+import { useWebSocket, type WebSocketNotification } from '@/lib/hooks/useWebSocket';
 import { toast } from 'sonner';
 
-export interface ReviewReminder {
-  id: string;
-  noteId: string;
-  title: string;
-  collection: string;
-  nextReviewDate: string;
-  overdue: boolean;
-  daysOverdue: number;
-  dueToday: boolean;
-}
+export type ReviewReminder = WebSocketNotification;
 
 interface NotificationContextType {
   notifications: ReviewReminder[];
@@ -33,46 +24,34 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
   const [readIds, setReadIds] = useState<Set<string>>(new Set());
   const [toastShownIds, setToastShownIds] = useState<Set<string>>(new Set());
 
-  const handleConnectionFailure = useCallback(() => {
-    console.warn('[WS] Disconnected after multiple failures');
-  }, []);
+  const {
+    connected,
+    notifications: wsNotifications,
+    subscribe,
+    connect,
+  } = useWebSocket({
+    autoConnect: false,
+    onNotification: (notification) => {
+      if (!toastShownIds.has(notification.id)) {
+        setToastShownIds((prev) => new Set(prev).add(notification.id));
 
-  const handleMessage = useCallback((data: any) => {
-    if (data.type === 'notification_batch') {
-      const newReminders = data.notifications || [];
-      console.log('[Notifications] Received batch:', newReminders.length, 'reminders');
+        const statusText = notification.overdue
+          ? `Overdue by ${notification.daysOverdue} day${notification.daysOverdue > 1 ? 's' : ''}`
+          : 'Due today';
 
-      // Show toast for newly received notifications
-      for (const reminder of newReminders) {
-        if (!toastShownIds.has(reminder.id)) {
-          setToastShownIds((prev) => new Set(prev).add(reminder.id));
-
-          const statusText = reminder.overdue
-            ? `Overdue by ${reminder.daysOverdue} day${reminder.daysOverdue > 1 ? 's' : ''}`
-            : 'Due today';
-
-          console.log('[Notifications] Showing toast:', reminder.title);
-          toast.info(`📚 Review: ${reminder.title}`, {
-            description: `${statusText} in ${reminder.collection}`,
-            duration: 5000,
-          });
-        }
+        console.log('[Notifications] Showing toast:', notification.title);
+        toast.info(`📚 Review: ${notification.title}`, {
+          description: `${statusText} in ${notification.collection}`,
+          duration: 5000,
+        });
       }
+    },
+  });
 
-      setNotifications(newReminders);
-    }
-  }, [toastShownIds]);
-
-  const { send } = useWebSocket(
-    session ? '/api/ws' : null,
-    handleMessage,
-    session ? handleConnectionFailure : undefined
-  );
-  const sendRef = useRef(send);
-
+  // Update notifications when WebSocket receives them
   useEffect(() => {
-    sendRef.current = send;
-  }, [send]);
+    setNotifications(wsNotifications);
+  }, [wsNotifications]);
 
   // Clear on logout
   useEffect(() => {
@@ -83,17 +62,24 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
     }
   }, [session]);
 
-  // Subscribe on login (only once when session is first available)
+  // Connect when session is available
   useEffect(() => {
-    if (session) {
-      sendRef.current({ type: 'subscribe', interval: 30000 });
+    if (session?.user?.id) {
+      console.log('[Notifications] Session available, connecting WebSocket:', session.user.id);
+      connect();
     }
-  }, [session]);
+  }, [session?.user?.id, connect]);
+
+  // Subscribe once connected
+  useEffect(() => {
+    if (session && connected) {
+      subscribe();
+    }
+  }, [session, connected, subscribe]);
 
   const markAsRead = useCallback((notificationId: string) => {
     setReadIds((prev) => new Set(prev).add(notificationId));
-    send({ type: 'ack', notificationId });
-  }, [send]);
+  }, []);
 
   const clearNotification = useCallback((notificationId: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== notificationId));

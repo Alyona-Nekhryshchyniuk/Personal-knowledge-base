@@ -24,20 +24,26 @@ export async function attachConnectionHandlers(ws: WebSocket, userId: string) {
   ws.on('message', async (data) => {
     try {
       const message = JSON.parse(data.toString());
+      console.log('[WS] Received message:', message.type);
       const result = clientMessageSchema.safeParse(message);
 
       if (!result.success) {
+        console.error('[WS] Schema validation failed:', result.error);
         ws.send(JSON.stringify({ type: 'error', message: 'Invalid message format' }));
         return;
       }
 
       if (result.data.type === 'subscribe') {
+        console.log('[WS] Processing subscribe message for user:', userId);
         const wsData = (ws as any).data;
         if (wsData) {
           wsData.intervalMs = result.data.interval;
+          console.log('[WS] Set interval to:', result.data.interval);
         }
 
+        console.log('[WS] Fetching notifications for user:', userId);
         const fresh = await getDueNotifications(userId);
+        console.log('[WS] Got notifications:', fresh.length);
         fresh.forEach((ntf) => wsData.notifiedIds.add(ntf.id));
 
         ws.send(
@@ -48,6 +54,7 @@ export async function attachConnectionHandlers(ws: WebSocket, userId: string) {
           })
         );
         wsData.lastSentAt = Date.now();
+        console.log('[WS] Sent notification batch');
       } else if (result.data.type === 'ack') {
         ws.send(
           JSON.stringify({
@@ -58,7 +65,12 @@ export async function attachConnectionHandlers(ws: WebSocket, userId: string) {
       }
     } catch (error) {
       console.error('[WS] Message handling error:', error);
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to process message' }));
+      console.error('[WS] Error stack:', error instanceof Error ? error.stack : 'No stack');
+      try {
+        ws.send(JSON.stringify({ type: 'error', message: 'Failed to process message' }));
+      } catch (sendError) {
+        console.error('[WS] Failed to send error message:', sendError);
+      }
     }
   });
 

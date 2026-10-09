@@ -20,28 +20,28 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts      Account[]
-  sessions      Session[]
-  collections   Collection[]
-  tags          Tag[]
-  notes         Note[]
+  accounts    Account[]
+  sessions    Session[]
+  collections Collection[]
+  tags        Tag[]
+  notes       Note[]
 
   @@map("User")
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String  @map("user_id")
-  type               String
-  provider           String
-  providerAccountId  String  @map("provider_account_id")
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -78,8 +78,8 @@ model Collection {
   updatedAt DateTime @updatedAt
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notes     Note[]
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes Note[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -94,8 +94,8 @@ model Tag {
   updatedAt DateTime @updatedAt
 
   // Relations
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  notes     NoteTag[]
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  notes NoteTag[]
 
   @@unique([userId, name])
   @@index([userId])
@@ -111,16 +111,17 @@ model Note {
   sourceUrl        String?
   status           String    @default("Active") // "Active" or "Archived"
   reviewInterval   String    @default("none") // "none", "daily", "weekly", "monthly", "custom"
-  customDays       Int?      // Only used when reviewInterval = "custom", must be >= 1
+  customDays       Int? // Only used when reviewInterval = "custom", must be >= 1
   nextReviewDate   DateTime? // UTC date only
   lastReviewedDate DateTime? // UTC date only
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
   // Relations
-  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collection       Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  tags             NoteTag[]
+  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection      Collection        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tags            NoteTag[]
+  notificationLog NotificationLog[]
 
   @@index([userId, nextReviewDate])
   @@index([userId, status])
@@ -135,8 +136,8 @@ model NoteTag {
   tagId  String
 
   // Relations
-  note   Note   @relation(fields: [noteId], references: [id], onDelete: Cascade)
-  tag    Tag    @relation(fields: [tagId], references: [id], onDelete: Cascade)
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+  tag  Tag  @relation(fields: [tagId], references: [id], onDelete: Cascade)
 
   @@unique([noteId, tagId])
   @@index([noteId])
@@ -144,13 +145,18 @@ model NoteTag {
   @@map("NoteTag")
 }
 
-// Optional: Notification log for server-side deduplication (not used in MVP - client-side dedup)
-// model NotificationLog {
-//   id               String   @id @default(cuid())
-//   userId           String
-//   noteId           String
-//   notificationHash String
-//   sentAt           DateTime @default(now())
-//
-//   @@index([userId, noteId, sentAt])
-// }
+model NotificationLog {
+  id      String    @id @default(cuid())
+  userId  String
+  noteId  String
+  sentAt  DateTime  @default(now())
+  ackedAt DateTime? // When user marked as read
+
+  // Relations
+  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, noteId])
+  @@index([userId])
+  @@index([userId, ackedAt])
+  @@map("NotificationLog")
+}
