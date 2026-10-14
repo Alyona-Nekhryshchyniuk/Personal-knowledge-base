@@ -1,21 +1,16 @@
 'use client';
 
-import React from 'react';
-import { IconButton, Badge, Tooltip, Box } from '@mui/material';
-import { Notifications as NotificationsIcon } from '@mui/icons-material';
 import { useNotifications } from '@/components/NotificationProvider';
+import { Badge, IconButton, Tooltip } from '@mui/material';
+import NotificationsIcon from '@mui/icons-material/Notifications';
 
-interface NotificationBadgeProps {
-  onClick: () => void;
-}
-
-export function NotificationBadge({ onClick }: NotificationBadgeProps) {
-  const { unreadCount } = useNotifications();
+export function NotificationBadge() {
+  const { notifications } = useNotifications();
 
   return (
-    <Tooltip title={`${unreadCount} new reminders`}>
-      <IconButton onClick={onClick} size="large" color={unreadCount > 0 ? 'error' : 'inherit'}>
-        <Badge badgeContent={unreadCount} color="error">
+    <Tooltip title="Review reminders">
+      <IconButton size="small" sx={{ position: 'relative' }}>
+        <Badge badgeContent={notifications.length} color="error">
           <NotificationsIcon />
         </Badge>
       </IconButton>

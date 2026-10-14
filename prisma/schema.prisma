@@ -20,11 +20,11 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  accounts    Account[]
-  sessions    Session[]
-  collections Collection[]
-  tags        Tag[]
-  notes       Note[]
+  accounts          Account[]
+  sessions          Session[]
+  collections       Collection[]
+  tags              Tag[]
+  notes             Note[]
 
   @@map("User")
 }
@@ -118,10 +118,9 @@ model Note {
   updatedAt        DateTime  @updatedAt
 
   // Relations
-  user            User              @relation(fields: [userId], references: [id], onDelete: Cascade)
-  collection      Collection        @relation(fields: [collectionId], references: [id], onDelete: Cascade)
-  tags            NoteTag[]
-  notificationLog NotificationLog[]
+  user       User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  collection Collection @relation(fields: [collectionId], references: [id], onDelete: Cascade)
+  tags       NoteTag[]
 
   @@index([userId, nextReviewDate])
   @@index([userId, status])
@@ -143,20 +142,4 @@ model NoteTag {
   @@index([noteId])
   @@index([tagId])
   @@map("NoteTag")
-}
-
-model NotificationLog {
-  id      String    @id @default(cuid())
-  userId  String
-  noteId  String
-  sentAt  DateTime  @default(now())
-  ackedAt DateTime? // When user marked as read
-
-  // Relations
-  note Note @relation(fields: [noteId], references: [id], onDelete: Cascade)
-
-  @@unique([userId, noteId])
-  @@index([userId])
-  @@index([userId, ackedAt])
-  @@map("NotificationLog")
 }

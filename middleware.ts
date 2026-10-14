@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(request: NextRequest) {
+  console.log('[MIDDLEWARE]', request.nextUrl.pathname);
+
   // Add CORS headers for API routes
   const response = NextResponse.next();
 
@@ -28,5 +30,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ['/api/((?!ws$).*)'],
 };

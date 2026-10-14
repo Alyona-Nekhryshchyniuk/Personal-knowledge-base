@@ -1,115 +1,133 @@
-import http from 'http';
+import { createServer } from 'http';
+import { WebSocketServer } from 'ws';
 import { parse } from 'url';
 import next from 'next';
-import { WebSocketServer } from 'ws';
-import { authenticateConnection } from './lib/ws/auth.ts';
-import { attachConnectionHandlers } from './lib/ws/handleConnection.ts';
-import { startScheduler } from './lib/ws/scheduler.ts';
+import { getToken } from 'next-auth/jwt';
+import { getDueNotifications } from './lib/services/notifications';
 
 const dev = process.env.NODE_ENV !== 'production';
-const hostname = 'localhost';
-const port = parseInt(process.env.PORT || '3000', 10);
-
-const app = next({ dev, hostname, port });
+const app = next({ dev });
 const handle = app.getRequestHandler();
 
+const checkInterval = parseInt(process.env.WS_CHECK_INTERVAL || '300000', 10);
+const connections = new Map<string, { send: (msg: string) => void; timer?: NodeJS.Timeout }>();
+
+function sendNotifications(send: (msg: string) => void, userId: string) {
+  getDueNotifications(userId)
+    .then((notifications) => {
+      send(
+        JSON.stringify({
+          type: 'review_reminder',
+          payload: { notifications },
+        })
+      );
+    })
+    .catch((err) => console.error('[WebSocket] Error:', err));
+}
+
 app.prepare().then(() => {
-  const server = http.createServer(async (req, res) => {
-    try {
-      const parsedUrl = parse(req.url!, true);
-      await handle(req, res, parsedUrl);
-    } catch (err) {
-      console.error('Error handling request:', err);
-      res.statusCode = 500;
-      res.end('Internal server error');
-    }
+  const server = createServer((req, res) => {
+    handle(req, res);
   });
 
   const wss = new WebSocketServer({ noServer: true });
 
+  // Handle HTTP upgrade for WebSocket
   server.on('upgrade', async (req, socket, head) => {
-    let pathname: string;
+    const pathname = req.url ? parse(req.url).pathname : '';
 
-    try {
-      pathname = new URL(
-        req.url || '/',
-        `http://${req.headers.host || 'localhost'}`
-      ).pathname;
-    } catch {
+    if (pathname !== '/api/ws') {
       socket.destroy();
       return;
     }
 
-    // Leave Next.js internal upgrade paths alone.
-    if (pathname !== '/api/ws') {
-      return;
-    }
-
-    console.log('[WS] WebSocket upgrade request received');
-
     try {
-      const session = await authenticateConnection(req);
+      // Extract session token from cookies
+      const cookieHeader = req.headers.cookie || '';
+      console.log('[WebSocket] Cookie header:', cookieHeader);
 
-      if (!session?.user?.id) {
-        if (!socket.destroyed) {
-          socket.write(
-            'HTTP/1.1 401 Unauthorized\r\n' +
-            'Connection: close\r\n\r\n'
-          );
-          socket.destroy();
-        }
+      const sessionToken = cookieHeader
+        .split(';')
+        .map((c: string) => c.trim())
+        .find((c: string) => c.startsWith('authjs.session-token'))
+        ?.split('=')[1];
+
+      console.log('[WebSocket] Session token extracted:', sessionToken ? 'yes' : 'no');
+
+      // Validate token
+      const token = await getToken({
+        req: {
+          headers: { cookie: cookieHeader }
+        } as any,
+        secret: process.env.NEXTAUTH_SECRET,
+      });
+
+      console.log('[WebSocket] Token valid:', token?.sub ? `yes (${token.sub})` : 'no');
+
+      if (!token?.sub) {
+        socket.write('HTTP/1.1 401 Unauthorized\r\n\r\n');
+        socket.destroy();
         return;
       }
 
-      if (socket.destroyed) return;
-
-      console.log('[WS] Connection authorized');
-
+      // Upgrade connection
       wss.handleUpgrade(req, socket, head, (ws) => {
-        wss.emit('connection', ws, session);
+        wss.emit('connection', ws, req, token.sub);
       });
-    } catch (error) {
-      console.error('[WS] Upgrade/authentication failed:', error);
-
-      if (!socket.destroyed) {
-        socket.write(
-          'HTTP/1.1 500 Internal Server Error\r\n' +
-          'Connection: close\r\n\r\n'
-        );
-        socket.destroy();
-      }
+    } catch (err) {
+      console.error('[WebSocket] Upgrade error:', err);
+      socket.write('HTTP/1.1 500 Internal Server Error\r\n\r\n');
+      socket.destroy();
     }
   });
 
-  wss.on('connection', async (ws, session: any) => {
-    const userId = session.user.id;
-    console.log(`[WS] Client connected: ${userId}`);
+  wss.on('connection', (ws: any, req: any, userId: string) => {
+    console.log(`[WebSocket] User ${userId} connected`);
 
-    try {
-      await attachConnectionHandlers(ws, userId);
-    } catch (err) {
-      console.error('[WS] Error attaching handlers:', err);
-      ws.send(JSON.stringify({ type: 'error', message: 'Failed to initialize connection' }));
-      ws.close();
-    }
+    // Close old connection if exists
+    const oldConn = connections.get(userId);
+    if (oldConn?.timer) clearInterval(oldConn.timer);
 
-    ws.on('error', (err) => {
-      console.error('[WS] Error:', err);
+    // Send initial batch
+    sendNotifications((msg) => {
+      if (ws.readyState === 1) ws.send(msg);
+    }, userId);
+
+    // Periodic check every 5 minutes
+    const timer = setInterval(() => {
+      if (ws.readyState === 1) {
+        sendNotifications((msg) => ws.send(msg), userId);
+      }
+    }, checkInterval);
+
+    connections.set(userId, { send: (msg) => ws.send(msg), timer });
+
+    ws.on('message', (data: Buffer) => {
+      try {
+        const message = JSON.parse(data.toString());
+        if (message.type === 'subscribe') {
+          console.log(`[WebSocket] User ${userId} subscribed`);
+          sendNotifications((msg) => ws.send(msg), userId);
+        }
+      } catch (err) {
+        console.error('[WebSocket] Message error:', err);
+      }
+    });
+
+    ws.on('close', () => {
+      console.log(`[WebSocket] User ${userId} disconnected`);
+      const conn = connections.get(userId);
+      if (conn?.timer) clearInterval(conn.timer);
+      connections.delete(userId);
+    });
+
+    ws.on('error', (err: Error) => {
+      console.error(`[WebSocket] Error:`, err);
     });
   });
 
-  startScheduler();
-
+  const port = parseInt(process.env.PORT || '3000', 10);
   server.listen(port, () => {
-    console.log(`> Ready on http://${hostname}:${port} (${dev ? 'development' : 'production'})`);
-    console.log(`> WebSocket available at ws://${hostname}:${port}/api/ws`);
-  });
-
-  server.on('error', (err: any) => {
-    if (err.code === 'EADDRINUSE') {
-      console.error(`Port ${port} is already in use`);
-      process.exit(1);
-    }
-    throw err;
+    console.log(`[Server] Listening on http://localhost:${port}`);
   });
 });

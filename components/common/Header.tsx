@@ -5,13 +5,10 @@ import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import LogoutIcon from '@mui/icons-material/Logout';
 import { NotificationBadge } from '@/components/notifications';
-import { NotificationPanel } from '@/components/notifications';
-import { useNotifications } from '@/components/NotificationProvider';
 
 export function Header() {
   const { data: session } = useSession();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [notificationPanelOpen, setNotificationPanelOpen] = useState(false);
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -42,7 +39,7 @@ export function Header() {
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {session?.user && (
             <>
-              <NotificationBadge onClick={() => setNotificationPanelOpen(true)} />
+              <NotificationBadge />
               <IconButton
                 onClick={handleMenuOpen}
                 size="small"
@@ -92,11 +89,6 @@ export function Header() {
           )}
         </Box>
       </Toolbar>
-
-      <NotificationPanel
-        open={notificationPanelOpen}
-        onClose={() => setNotificationPanelOpen(false)}
-      />
     </AppBar>
   );
 }

@@ -117,13 +117,14 @@ Using a structured spec-driven approach with the following artifacts:
 - **Client Display**: Convert to user's local time (browser-detected or user preference)
 
 #### WebSocket Notifications
-- **Interval**: Check for review-due notes every 5 minutes (configurable)
-- **Deduplication**: Track sent notification hashes client-side; server doesn't re-send within 5-min window
+- **Interval**: Check for review-due notes every 5 minutes (configurable via `WS_CHECK_INTERVAL` env var)
+- **Filtering**: Only send notifications for notes where `status = 'Active'` AND `reviewInterval != 'none'`
+- **Deduplication**: Client-side only (tracks seen notification IDs in browser; avoids duplicate UI spam)
 - **Connection Behavior**: 
-  - On connect: Send batch of all due/overdue notes
-  - Periodic: Check and send new due notes
-  - On client message (e.g., `subscribe`): Reset checks, send fresh batch
-- **Closed Loop**: Client sends acknowledgment; server removes from queue
+  - On connect: Send initial batch of all currently due/overdue notes
+  - Periodic: Check every 5 min and send new due notes
+  - On client `subscribe` message: Re-query and send fresh batch
+- **Client Message**: `subscribe` message forces server to re-query and resend all current notifications
 
 #### Data Privacy
 - **Authorization Model**: Row-level security via user_id foreign key
@@ -253,28 +254,36 @@ npm run test
 
 ### WebSocket Endpoint
 - **URL**: `ws://localhost:3000/api/ws`
-- **Auth**: Query param `?token=<session-token>` or bearer header
-- **Client → Server Message**:
-  ```json
-  {
-    "type": "subscribe",
-    "payload": { "interval": "5m" }
+- **Auth**: Requires valid next-auth session (via cookie or token in query param)
+- **Message Format**: All messages are JSON with `type` and `payload`
+
+**Server → Client (Notifications)**:
+```json
+{
+  "type": "review_reminder",
+  "payload": {
+    "notifications": [
+      {
+        "noteId": "uuid",
+        "title": "Note Title",
+        "collection": "Collection Name",
+        "nextReviewDate": "2026-10-15",
+        "overdue": false,
+        "daysOverdue": 0
+      }
+    ]
   }
-  ```
-- **Server → Client Notification**:
-  ```json
-  {
-    "type": "review_reminder",
-    "data": {
-      "noteId": "uuid",
-      "title": "string",
-      "collection": "string",
-      "nextReviewDate": "2026-10-15",
-      "overdue": false,
-      "daysOverdue": 0
-    }
-  }
-  ```
+}
+```
+
+**Client → Server (Subscription)**:
+```json
+{
+  "type": "subscribe",
+  "payload": {}
+}
+```
+Causes server to re-query and send fresh notification batch.
 
 ---
 

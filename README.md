@@ -206,71 +206,46 @@ npm run type-check      # TypeScript type check
 
 ### WebSocket (Real-time notifications)
 
-**Endpoint**: `ws://localhost:3000/api/ws` — Real-time review reminders via WebSocket
+**Endpoint**: `ws://localhost:3000/api/ws`
 
-**Authentication**: Requires valid session (cookie or Bearer token)
+**Authentication**: Requires valid next-auth session
 
-**Server → Client Messages**:
-- `review_reminder` — Notification that notes are due or overdue for review
-  ```json
-  {
-    "type": "review_reminder",
-    "data": {
-      "id": "notification-id",
-      "noteId": "note-uuid",
-      "title": "Note Title",
-      "collection": "Collection Name",
-      "nextReviewDate": "2026-10-15",
-      "overdue": false,
-      "daysOverdue": 0,
-      "dueToday": true
-    }
+**Server → Client** (Review Reminders):
+```json
+{
+  "type": "review_reminder",
+  "payload": {
+    "notifications": [
+      {
+        "noteId": "note-uuid",
+        "title": "Note Title",
+        "collection": "Collection Name",
+        "nextReviewDate": "2026-10-15",
+        "overdue": false,
+        "daysOverdue": 0
+      }
+    ]
   }
-  ```
+}
+```
 
-**Client → Server Messages**:
+**Client → Server** (Subscribe for fresh notifications):
+```json
+{
+  "type": "subscribe",
+  "payload": {}
+}
+```
 
-- **`subscribe`** — Request server to send fresh notification batch
-  - Use when: Page loads, user manually refreshes, or after marking note as reviewed
-  - Payload: `{ "type": "subscribe", "payload": {} }`
-  - Server behavior: Clears dedup state, re-queries all due/overdue notes, sends fresh batch
-  - Example:
-    ```json
-    { "type": "subscribe", "payload": {} }
-    ```
+**Behavior**:
+- On connection: Server sends initial batch of all notes due today or overdue
+- Every 5 minutes: Server checks for new due notes and sends batch
+- On `subscribe` message: Server re-queries all due/overdue notes and sends fresh batch
+- Archived notes are **never** sent in notifications
+- Notes with no review schedule (`reviewInterval = 'none'`) are **never** sent
+- Client-side deduplication: Browser tracks sent notification IDs to prevent duplicate UI toasts
 
-- **`acknowledge`** — Dismiss/acknowledge a notification
-  - Use when: User dismisses a notification in the UI
-  - Payload: `{ "type": "acknowledge", "payload": { "notificationId": "..." } }`
-  - Server behavior: Logs acknowledgment (for client-side dedup, no server-side removal needed)
-  - Example:
-    ```json
-    { "type": "acknowledge", "payload": { "notificationId": "notification-123" } }
-    ```
-
-- **`ping`** — Keep-alive heartbeat to prevent connection timeout
-  - Use when: Periodically (every 30 seconds) to detect stale connections
-  - Payload: `{ "type": "ping", "payload": {} }`
-  - Server responds with: `{ "type": "pong" }`
-
-**Duplicate Prevention**:
-- Uses **client-side deduplication** strategy
-- Client maintains Set of seen notification IDs
-- Hash computed: `noteId + nextReviewDate + overdue`
-- Same notification not re-rendered if already shown
-- Subscribe message clears dedup state (forces refresh)
-
-**Check Interval**:
-- Server checks for new due notes every **5 minutes** (configurable via `WS_CHECK_INTERVAL` env var)
-- Initial batch sent on connection
-- Periodic batches sent if new notes become due
-
-**Connection Behavior**:
-- Automatic reconnection on disconnect (exponential backoff)
-- Max 5 reconnection attempts before giving up
-- Shows "Reconnecting..." message during reconnect attempts
-
-**Full Protocol Documentation**: See `specs/001-personal-knowledge-base/contracts/websocket.md` for complete specification with examples and error codes.
+**Configuration**: Set `WS_CHECK_INTERVAL` environment variable (default: 300000 ms = 5 minutes)
 
 ---
 

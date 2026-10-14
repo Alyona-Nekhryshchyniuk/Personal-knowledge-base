@@ -3,317 +3,140 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 
 export interface WebSocketNotification {
-  id: string;
   noteId: string;
   title: string;
-  collection: string;
+  collectionName: string;
   nextReviewDate: string;
   overdue: boolean;
   daysOverdue: number;
-  dueToday: boolean;
 }
 
-interface UseWebSocketOptions {
-  autoConnect?: boolean;
-  reconnectAttempts?: number;
-  reconnectDelay?: number;
-  onNotification?: (notification: WebSocketNotification) => void;
-  onError?: (error: string) => void;
-  onConnect?: () => void;
-  onDisconnect?: () => void;
+interface WebSocketMessage {
+  type: string;
+  payload: any;
 }
 
-export function useWebSocket(options: UseWebSocketOptions = {}) {
-  const {
-    autoConnect = true,
-    reconnectAttempts = 5,
-    reconnectDelay = 3000,
-    onNotification,
-    onError,
-    onConnect,
-    onDisconnect,
-  } = options;
+const BACKOFF_DELAYS = [1000, 5000, 10000, 30000, 60000];
+const MAX_RECONNECT_ATTEMPTS = 5;
 
-  const ws = useRef<WebSocket | null>(null);
-  const reconnectTimeout = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const reconnectCountRef = useRef(0);
-  const shouldReconnect = useRef(false);
-  const seenNotifications = useRef(new Set<string>());
+export function useWebSocket() {
+  const [notifications, setNotifications] = useState<WebSocketNotification[]>([]);
+  const [isConnected, setIsConnected] = useState(false);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
-  const callbacks = useRef({
-    onNotification,
-    onError,
-    onConnect,
-    onDisconnect,
-  });
+  const wsRef = useRef<WebSocket | null>(null);
+  const seenRef = useRef<Set<string>>(new Set());
+  const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Keep callbacks current without restarting the socket effect.
-  useEffect(() => {
-    callbacks.current = {
-      onNotification,
-      onError,
-      onConnect,
-      onDisconnect,
-    };
-  }, [onNotification, onError, onConnect, onDisconnect]);
-
-  const [connected, setConnected] = useState(false);
-  const [notifications, setNotifications] =
-    useState<WebSocketNotification[]>([]);
-  const [reconnectCount, setReconnectCount] = useState(0);
-  const [lastError, setLastError] = useState<string | null>(null);
-
-  const getWebSocketUrl = useCallback(() => {
-    if (typeof window === 'undefined') return null;
-
-    const protocol =
-      window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-
-    return `${protocol}//${window.location.host}/api/ws`;
+  const hashNotification = useCallback((notif: WebSocketNotification): string => {
+    return `${notif.noteId}-${notif.nextReviewDate}-${notif.overdue}`;
   }, []);
-
-  const handleNotification = useCallback(
-    (notification: WebSocketNotification) => {
-      if (!notification?.id) {
-        console.warn('[WS] Ignoring notification without an ID');
-        return;
-      }
-
-      if (seenNotifications.current.has(notification.id)) return;
-
-      seenNotifications.current.add(notification.id);
-      setNotifications((prev) => [...prev, notification]);
-      callbacks.current.onNotification?.(notification);
-
-      const socket = ws.current;
-
-      if (socket?.readyState === WebSocket.OPEN) {
-        socket.send(
-          JSON.stringify({
-            type: 'ack',
-            notificationId: notification.id,
-          })
-        );
-      }
-    },
-    []
-  );
 
   const connect = useCallback(() => {
-    if (typeof window === 'undefined') return;
-
-    const current = ws.current;
-
-    // Do not create competing connections.
-    if (
-      current &&
-      (current.readyState === WebSocket.CONNECTING ||
-        current.readyState === WebSocket.OPEN)
-    ) {
+    if (wsRef.current?.readyState === WebSocket.OPEN || wsRef.current?.readyState === WebSocket.CONNECTING) {
       return;
     }
-
-    if (reconnectTimeout.current) {
-      clearTimeout(reconnectTimeout.current);
-      reconnectTimeout.current = null;
-    }
-
-    const url = getWebSocketUrl();
-
-    if (!url) {
-      setLastError('Unable to determine WebSocket URL');
-      return;
-    }
-
-    console.log('[WS] Connecting to', url);
-
-    let socket: WebSocket;
 
     try {
-      socket = new WebSocket(url);
-      ws.current = socket;
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'Connection failed';
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/api/ws`;
 
-      console.error('[WS] Connection construction failed:', message);
-      setLastError(message);
-      callbacks.current.onError?.(message);
-      return;
-    }
+      const ws = new WebSocket(wsUrl);
 
-    socket.onopen = () => {
-      if (ws.current !== socket) return;
+      ws.onopen = () => {
+        console.log('[WebSocket] Connected');
+        setIsConnected(true);
+        setIsReconnecting(false);
+        reconnectAttemptsRef.current = 0;
+        seenRef.current.clear();
+        wsRef.current = ws;
+      };
 
-      console.log('[WS] Connected to', url);
-      setConnected(true);
-      setReconnectCount(0);
-      reconnectCountRef.current = 0;
-      setLastError(null);
-      callbacks.current.onConnect?.();
-    };
+      ws.onmessage = (event: MessageEvent) => {
+        try {
+          const message: WebSocketMessage = JSON.parse(event.data);
 
-    socket.onmessage = (event) => {
-      try {
-        const message = JSON.parse(event.data);
+          if (message.type === 'review_reminder' && message.payload?.notifications) {
+            const newNotifications = message.payload.notifications.filter((notif: WebSocketNotification) => {
+              const hash = hashNotification(notif);
+              if (seenRef.current.has(hash)) {
+                return false;
+              }
+              seenRef.current.add(hash);
+              return true;
+            });
 
-        switch (message.type) {
-          case 'notification_batch':
-            if (Array.isArray(message.notifications)) {
-              message.notifications.forEach(handleNotification);
+            if (newNotifications.length > 0) {
+              setNotifications((prev) => {
+                // Deduplicate against existing notifications too
+                const dedupedHashes = new Set(prev.map(hashNotification));
+                const filtered = newNotifications.filter((notif) => !dedupedHashes.has(hashNotification(notif)));
+                return [...prev, ...filtered];
+              });
             }
-            break;
-
-          case 'ack_ok':
-            console.log(
-              '[WS] Notification acknowledged:',
-              message.notificationId
-            );
-            break;
-
-          case 'error':
-            console.error('[WS] Server error:', message.message);
-            setLastError(message.message);
-            callbacks.current.onError?.(message.message);
-            break;
-
-          default:
-            console.warn('[WS] Unknown message type:', message.type);
+          }
+        } catch (err) {
+          console.error('[WebSocket] Message parse error:', err);
         }
-      } catch (error) {
-        console.error('[WS] Error parsing message:', error);
-      }
-    };
+      };
 
-    socket.onerror = () => {
-      // Browsers generally don't expose the underlying failure reason.
-      console.error('[WS] Connection error');
-      setLastError('WebSocket connection error');
-      callbacks.current.onError?.('WebSocket connection error');
-    };
+      ws.onerror = (error) => {
+        console.error('[WebSocket] Error:', error);
+      };
 
-    socket.onclose = (event) => {
-      console.log('[WS] Closed', {
-        code: event.code,
-        reason: event.reason,
-        wasClean: event.wasClean,
-      });
+      ws.onclose = () => {
+        console.log('[WebSocket] Disconnected');
+        setIsConnected(false);
+        wsRef.current = null;
 
-      if (ws.current === socket) {
-        ws.current = null;
-        setConnected(false);
-      }
+        if (reconnectAttemptsRef.current < MAX_RECONNECT_ATTEMPTS) {
+          setIsReconnecting(true);
+          const delay = BACKOFF_DELAYS[Math.min(reconnectAttemptsRef.current, BACKOFF_DELAYS.length - 1)];
+          reconnectAttemptsRef.current += 1;
 
-      callbacks.current.onDisconnect?.();
-
-      // Manual disconnect or React cleanup must not reconnect.
-      if (!shouldReconnect.current) return;
-
-      if (reconnectCountRef.current < reconnectAttempts) {
-        const attempt = reconnectCountRef.current + 1;
-        reconnectCountRef.current = attempt;
-        setReconnectCount(attempt);
-
-        const delay = reconnectDelay * Math.pow(2, attempt - 1);
-
-        console.log(
-          `[WS] Reconnecting in ${delay}ms (attempt ${attempt}/${reconnectAttempts})`
-        );
-
-        reconnectTimeout.current = setTimeout(() => {
-          reconnectTimeout.current = null;
-          if (shouldReconnect.current) connect();
-        }, delay);
-      } else {
-        console.error('[WS] Max reconnection attempts reached');
-        setLastError('Connection lost - max reconnection attempts reached');
-      }
-    };
-  }, [getWebSocketUrl, handleNotification, reconnectAttempts, reconnectDelay]);
-
-  const disconnect = useCallback(() => {
-    shouldReconnect.current = false;
-
-    if (reconnectTimeout.current) {
-      clearTimeout(reconnectTimeout.current);
-      reconnectTimeout.current = null;
+          reconnectTimeoutRef.current = setTimeout(() => {
+            console.log(`[WebSocket] Reconnecting... (attempt ${reconnectAttemptsRef.current})`);
+            connect();
+          }, delay);
+        } else {
+          console.error('[WebSocket] Max reconnection attempts reached');
+          setIsReconnecting(false);
+        }
+      };
+    } catch (err) {
+      console.error('[WebSocket] Connection error:', err);
     }
-
-    const socket = ws.current;
-    ws.current = null;
-
-    if (socket) {
-      // Prevent intentional closure from triggering reconnect logic.
-      socket.onclose = null;
-      socket.close(1000, 'Client disconnected');
-    }
-
-    setConnected(false);
-    setNotifications([]);
-    seenNotifications.current.clear();
-  }, []);
-
-  const manualConnect = useCallback(() => {
-    shouldReconnect.current = true;
-    reconnectCountRef.current = 0;
-    setReconnectCount(0);
-    connect();
-  }, [connect]);
+  }, [hashNotification]);
 
   const subscribe = useCallback(() => {
-    const socket = ws.current;
-
-    if (socket?.readyState === WebSocket.OPEN) {
-      console.log('[WS] Sending subscribe message');
-
-      socket.send(
-        JSON.stringify({
-          type: 'subscribe',
-          interval: 30000,
-        })
-      );
+    if (wsRef.current?.readyState === WebSocket.OPEN) {
+      wsRef.current.send(JSON.stringify({ type: 'subscribe', payload: {} }));
     }
   }, []);
 
-  const clearNotifications = useCallback(() => {
-    setNotifications([]);
-    seenNotifications.current.clear();
+  const dismissNotification = useCallback((noteId: string) => {
+    setNotifications((prev) => prev.filter((notif) => notif.noteId !== noteId));
   }, []);
 
   useEffect(() => {
-    if (!autoConnect) return;
-
-    shouldReconnect.current = true;
     connect();
 
     return () => {
-      shouldReconnect.current = false;
-
-      if (reconnectTimeout.current) {
-        clearTimeout(reconnectTimeout.current);
-        reconnectTimeout.current = null;
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
       }
-
-      const socket = ws.current;
-      ws.current = null;
-
-      if (socket) {
-        socket.onclose = null;
-        socket.close(1000, 'Effect cleanup');
+      if (wsRef.current) {
+        wsRef.current.close();
       }
-
-      setConnected(false);
     };
-  }, [autoConnect, connect]);
+  }, [connect]);
 
   return {
-    connected,
     notifications,
-    reconnectCount,
-    lastError,
-    connect: manualConnect,
-    disconnect,
+    isConnected,
+    isReconnecting,
     subscribe,
-    clearNotifications,
+    dismissNotification,
   };
 }

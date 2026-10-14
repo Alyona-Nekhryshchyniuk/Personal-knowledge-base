@@ -4,6 +4,9 @@ const nextConfig = {
   typescript: {
     tsconfigPath: './tsconfig.json',
   },
+  experimental: {
+    serverComponentsExternalPackages: ['ws'],
+  },
   headers: async () => {
     return [
       {
