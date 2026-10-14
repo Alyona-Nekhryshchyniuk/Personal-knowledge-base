@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { getDismissedNotifications } from '@/lib/utils/dismissedNotifications';
 
 export interface WebSocketNotification {
   noteId: string;
@@ -58,7 +59,13 @@ export function useWebSocket() {
           const message: WebSocketMessage = JSON.parse(event.data);
 
           if (message.type === 'review_reminder' && message.payload?.notifications) {
+            const dismissed = getDismissedNotifications();
             const newNotifications = message.payload.notifications.filter((notif: WebSocketNotification) => {
+              // Filter out dismissed notifications
+              if (dismissed.has(notif.noteId)) {
+                return false;
+              }
+
               const hash = hashNotification(notif);
               if (seenRef.current.has(hash)) {
                 return false;

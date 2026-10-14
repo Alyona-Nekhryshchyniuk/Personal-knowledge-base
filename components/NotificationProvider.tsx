@@ -1,6 +1,6 @@
 'use client';
 
-import { ReactNode, createContext, useContext } from 'react';
+import { ReactNode, createContext, useContext, useState } from 'react';
 import { useWebSocket, WebSocketNotification } from '@/lib/hooks/useWebSocket';
 
 interface NotificationContextType {
@@ -9,15 +9,32 @@ interface NotificationContextType {
   isReconnecting: boolean;
   subscribe: () => void;
   dismissNotification: (noteId: string) => void;
+  showNotifications: boolean;
+  toggleNotifications: () => void;
 }
 
 const NotificationContext = createContext<NotificationContextType | undefined>(undefined);
 
 export function NotificationProvider({ children }: { children: ReactNode }) {
   const { notifications, isConnected, isReconnecting, subscribe, dismissNotification } = useWebSocket();
+  const [showNotifications, setShowNotifications] = useState(true);
+
+  const toggleNotifications = () => {
+    setShowNotifications((prev) => !prev);
+  };
 
   return (
-    <NotificationContext.Provider value={{ notifications, isConnected, isReconnecting, subscribe, dismissNotification }}>
+    <NotificationContext.Provider
+      value={{
+        notifications,
+        isConnected,
+        isReconnecting,
+        subscribe,
+        dismissNotification,
+        showNotifications,
+        toggleNotifications,
+      }}
+    >
       {children}
     </NotificationContext.Provider>
   );

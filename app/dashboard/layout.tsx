@@ -8,7 +8,6 @@ import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Header } from '@/components/common/Header';
 import { Sidebar } from '@/components/common/Sidebar';
-import { NotificationPanel } from '@/components/notifications';
 
 function DashboardContent({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
@@ -73,7 +72,6 @@ function DashboardContent({ children }: { children: ReactNode }) {
             p: 2,
           }}
         >
-          <NotificationPanel />
           {children}
         </Box>
       </Box>

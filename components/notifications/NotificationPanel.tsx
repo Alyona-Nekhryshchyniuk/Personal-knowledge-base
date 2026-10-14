@@ -2,132 +2,104 @@
 
 import { useNotifications } from '@/components/NotificationProvider';
 import { toast } from 'sonner';
-import { useEffect, useState } from 'react';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-  Button,
-  Stack,
-  Typography,
-  Chip,
-  Box,
-  IconButton,
-  Collapse,
-  Alert,
-} from '@mui/material';
+import { useEffect, useRef } from 'react';
 import CloseIcon from '@mui/icons-material/Close';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import { useSession } from 'next-auth/react';
+import { IconButton } from '@mui/material';
+import { addDismissedNotification } from '@/lib/utils/dismissedNotifications';
 
+/**
+ * Toast notification renderer - shows notifications as pop-ups
+ * Renders invisibly but triggers toasts when new notifications arrive
+ */
 export function NotificationPanel() {
-  const { notifications, isConnected, isReconnecting, subscribe, dismissNotification } = useNotifications();
-  const { data: session } = useSession();
-  const [expanded, setExpanded] = useState(true);
-  const [lastNotifCount, setLastNotifCount] = useState(0);
+  const { notifications, showNotifications, dismissNotification } = useNotifications();
+  const lastProcessedRef = useRef<Set<string>>(new Set());
+  const activeToastsRef = useRef<Map<string, string>>(new Map());
 
   useEffect(() => {
-    if (notifications.length > lastNotifCount) {
-      const newNotifs = notifications.slice(lastNotifCount);
-      newNotifs.forEach((notif) => {
-        const status = notif.overdue ? `Overdue by ${notif.daysOverdue} days` : 'Due today';
-        toast.info(`${notif.title} - ${status}`);
+    // If notifications are hidden, dismiss all toasts
+    if (!showNotifications) {
+      activeToastsRef.current.forEach((toastId) => {
+        toast.dismiss(toastId);
       });
-      setLastNotifCount(notifications.length);
+      activeToastsRef.current.clear();
+      return;
     }
-  }, [notifications, lastNotifCount]);
 
-  if (!session) return null;
+    // When showing notifications again, reset the processed set so toasts can be recreated
+    if (showNotifications && activeToastsRef.current.size === 0) {
+      lastProcessedRef.current.clear();
+    }
 
-  return (
-    <Card sx={{ mb: 2 }}>
-      <CardHeader
-        title={
-          <Box display="flex" alignItems="center" gap={1}>
-            <span>Review Reminders</span>
-            {!isConnected && isReconnecting && <Chip label="Reconnecting..." size="small" color="warning" />}
-            {!isConnected && !isReconnecting && <Chip label="Disconnected" size="small" color="error" />}
-            {isConnected && <Chip label="Connected" size="small" color="success" />}
-          </Box>
-        }
-        action={
-          <IconButton
-            onClick={() => setExpanded(!expanded)}
-            aria-expanded={expanded}
-            aria-label="show more"
-            size="small"
-          >
-            <ExpandMoreIcon sx={{ transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: '0.3s' }} />
-          </IconButton>
-        }
-      />
+    notifications.forEach((notif, index) => {
+      const key = `${notif.noteId}-${notif.nextReviewDate}`;
 
-      <Collapse in={expanded} timeout="auto" unmountOnExit>
-        <CardContent>
-          {notifications.length === 0 ? (
-            <Typography variant="body2" color="textSecondary">
-              No review reminders
-            </Typography>
-          ) : (
-            <Stack spacing={1}>
-              {notifications.map((notif, idx) => (
-                <Box
-                  key={`${notif.noteId}-${notif.nextReviewDate}-${idx}`}
-                  sx={{
-                    p: 1.5,
-                    border: '1px solid',
-                    borderColor: notif.overdue ? '#ff6b6b' : '#ffa500',
-                    borderRadius: 1,
-                    backgroundColor: notif.overdue ? 'rgba(255, 107, 107, 0.05)' : 'rgba(255, 165, 0, 0.05)',
+      if (!lastProcessedRef.current.has(key)) {
+        lastProcessedRef.current.add(key);
+
+        const status = notif.overdue
+          ? `Overdue by ${notif.daysOverdue} day${notif.daysOverdue !== 1 ? 's' : ''}`
+          : 'Due today';
+
+        const borderColor = notif.overdue ? '#ff6b6b' : '#ffa500';
+
+        // Stagger toast creation to prevent overlap
+        setTimeout(() => {
+          const toastId: string = toast(
+            <div style={{ position: 'relative', width: '100%', pr: '8px' }}>
+              <IconButton
+                size="small"
+                onClick={() => {
+                  addDismissedNotification(notif.noteId);
+                  dismissNotification(notif.noteId);
+                  toast.dismiss(toastId);
+                }}
+                sx={{
+                  position: 'absolute',
+                  top: '-4px',
+                  right: '-4px',
+                  p: '4px',
+                  minWidth: 'auto',
+                  color: '#999',
+                  '&:hover': { color: '#333' },
+                }}
+              >
+                <CloseIcon fontSize="small" />
+              </IconButton>
+              <div style={{ paddingRight: '24px' }}>
+                <div style={{ fontWeight: 600, marginBottom: '4px' }}>
+                  {notif.title}
+                </div>
+                <div style={{ fontSize: '0.9em', color: '#666', marginBottom: '4px' }}>
+                  {notif.collectionName}
+                </div>
+                <div
+                  style={{
+                    fontSize: '0.85em',
+                    color: borderColor,
+                    fontWeight: 600,
                   }}
                 >
-                  <Box display="flex" justifyContent="space-between" alignItems="start" gap={1}>
-                    <Box flex={1}>
-                      <Typography variant="subtitle2" fontWeight={600}>
-                        {notif.title}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary">
-                        {notif.collectionName}
-                      </Typography>
-                      <Box mt={0.5}>
-                        <Chip
-                          label={
-                            notif.overdue
-                              ? `Overdue by ${notif.daysOverdue} day${notif.daysOverdue !== 1 ? 's' : ''}`
-                              : 'Due today'
-                          }
-                          size="small"
-                          color={notif.overdue ? 'error' : 'warning'}
-                          variant="outlined"
-                        />
-                      </Box>
-                    </Box>
-                    <IconButton
-                      size="small"
-                      onClick={() => dismissNotification(notif.noteId)}
-                      sx={{ mt: -0.5 }}
-                    >
-                      <CloseIcon fontSize="small" />
-                    </IconButton>
-                  </Box>
-                </Box>
-              ))}
-            </Stack>
-          )}
+                  {status}
+                </div>
+              </div>
+            </div>,
+            {
+              duration: 6000,
+              style: {
+                backgroundColor: '#ffffff',
+                border: `2px solid ${borderColor}`,
+                borderRadius: '8px',
+                padding: '12px 16px',
+                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
+              },
+            }
+          );
+          activeToastsRef.current.set(key, toastId);
+        }, index * 200); // 200ms stagger between each toast
+      }
+    });
+  }, [notifications, showNotifications]);
 
-          <Box mt={2} display="flex" gap={1}>
-            <Button
-              size="small"
-              variant="outlined"
-              onClick={() => subscribe()}
-              disabled={!isConnected}
-            >
-              Refresh
-            </Button>
-          </Box>
-        </CardContent>
-      </Collapse>
-    </Card>
-  );
+  return null;
 }

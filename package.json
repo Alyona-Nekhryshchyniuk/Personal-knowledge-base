@@ -4,7 +4,7 @@
   "description": "Personal Knowledge Base with Review Reminders - SSO Auth, Collections, Tags, Notes, and Real-time Review Notifications",
   "private": true,
   "scripts": {
-    "dev": "tsx server.ts",
+    "dev": "cross-env NODE_ENV=development NODE_OPTIONS=--use-system-ca tsx server.ts",
     "build": "next build",
     "start": "tsx server.ts",
     "lint": "next lint",
