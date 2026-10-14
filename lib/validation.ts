@@ -25,29 +25,29 @@ export const updateTagSchema = z.object({
 export const reviewIntervalSchema = z.enum(['none', 'daily', 'weekly', 'monthly', 'custom']);
 
 export const createNoteSchema = z.object({
-  title: z.string().min(1).max(500),
-  content: z.string().min(1),
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters'),
+  content: z.string().min(1, 'Content is required'),
   collectionId: z.string().cuid(),
   tags: z.array(z.string().cuid()).default([]),
-  sourceUrl: z.string().url().optional(),
+  sourceUrl: z.string().url('Source URL must be a valid URL').optional().or(z.literal('')),
   reviewInterval: reviewIntervalSchema.default('none'),
-  customDays: z.number().int().positive().optional(),
+  customDays: z.number().int('Custom days must be an integer').positive('Custom days must be greater than 0').optional(),
 }).refine(
-  (data) => data.reviewInterval !== 'custom' || data.customDays,
-  { message: 'customDays is required when reviewInterval is custom', path: ['customDays'] }
+  (data) => data.reviewInterval !== 'custom' || (data.customDays && data.customDays > 0),
+  { message: 'Custom days must be greater than 0 when review interval is custom', path: ['customDays'] }
 );
 
 export const updateNoteSchema = z.object({
-  title: z.string().min(1).max(500).optional(),
-  content: z.string().min(1).optional(),
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters').optional(),
+  content: z.string().min(1, 'Content is required').optional(),
   collectionId: z.string().cuid().optional(),
   tags: z.array(z.string().cuid()).optional(),
-  sourceUrl: z.string().url().optional(),
+  sourceUrl: z.string().url('Source URL must be a valid URL').optional().or(z.literal('')),
   reviewInterval: reviewIntervalSchema.optional(),
-  customDays: z.number().int().positive().optional(),
+  customDays: z.number().int('Custom days must be an integer').positive('Custom days must be greater than 0').optional(),
 }).refine(
-  (data) => data.reviewInterval !== 'custom' || data.customDays,
-  { message: 'customDays is required when reviewInterval is custom', path: ['customDays'] }
+  (data) => data.reviewInterval !== 'custom' || (data.customDays && data.customDays > 0),
+  { message: 'Custom days must be greater than 0 when review interval is custom', path: ['customDays'] }
 );
 
 export const moveNoteSchema = z.object({

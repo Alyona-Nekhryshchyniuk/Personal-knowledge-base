@@ -1,8 +1,7 @@
 'use client';
 
 import { ReactNode } from 'react';
-import { Box, useMediaQuery, useTheme, IconButton } from '@mui/material';
-import MenuIcon from '@mui/icons-material/Menu';
+import { Box, useMediaQuery, useTheme } from '@mui/material';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -41,22 +40,9 @@ function DashboardContent({ children }: { children: ReactNode }) {
 
   return (
     <Box suppressHydrationWarning sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <Header />
+      <Header onMenuOpen={() => setSidebarOpen(true)} />
 
       <Box suppressHydrationWarning sx={{ display: 'flex', flex: 1 }}>
-        {mounted && isMobile && (
-          <IconButton
-            onClick={() => setSidebarOpen(true)}
-            sx={{
-              position: 'fixed',
-              bottom: 20,
-              right: 20,
-              zIndex: 100,
-            }}
-          >
-            <MenuIcon />
-          </IconButton>
-        )}
 
         {mounted ? (
           <Sidebar open={sidebarOpen} onClose={() => setSidebarOpen(false)} />

@@ -83,6 +83,8 @@ export async function listNotes(
   // Filter by review state if provided
   if (filters?.reviewState) {
     const today = getTodayUTC();
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
     const in7Days = new Date(today);
     in7Days.setDate(in7Days.getDate() + 7);
 
@@ -95,14 +97,14 @@ export async function listNotes(
 
       switch (filters.reviewState) {
         case 'due':
-          return nextReview.getTime() <= today.getTime() && note.status === 'Active';
+          return nextReview.getTime() === today.getTime() && note.status === 'Active';
         case 'overdue':
           return nextReview.getTime() < today.getTime() && note.status === 'Active';
         case 'next7days':
           return (
-            (nextReview.getTime() >= today.getTime() &&
-              nextReview.getTime() <= in7Days.getTime()) ||
-            (nextReview.getTime() < today.getTime() && note.status === 'Active')
+            nextReview.getTime() >= tomorrow.getTime() &&
+            nextReview.getTime() <= in7Days.getTime() &&
+            note.status === 'Active'
           );
         case 'none':
           return !note.nextReviewDate;
@@ -138,11 +140,23 @@ export async function createNote(userId: string, input: CreateNoteInput) {
   }
 
   if (!input.title || input.title.trim().length === 0) {
-    throw new Error('Note title is required');
+    throw new Error('Title must be non-empty');
   }
 
   if (!input.content || input.content.trim().length === 0) {
-    throw new Error('Note content is required');
+    throw new Error('Content must be non-empty');
+  }
+
+  if (input.sourceUrl && input.sourceUrl.trim()) {
+    try {
+      new URL(input.sourceUrl.trim());
+    } catch {
+      throw new Error('Source URL must be a valid URL');
+    }
+  }
+
+  if (input.reviewInterval === 'custom' && (!input.customDays || input.customDays <= 0)) {
+    throw new Error('Custom days must be greater than 0 when review interval is custom');
   }
 
   if (!input.collectionId) {
@@ -272,6 +286,26 @@ export async function updateNote(userId: string, noteId: string, input: UpdateNo
     throw new Error('Note not found or not owned by user');
   }
 
+  if (input.title !== undefined && (!input.title || input.title.trim().length === 0)) {
+    throw new Error('Title must be non-empty');
+  }
+
+  if (input.content !== undefined && (!input.content || input.content.trim().length === 0)) {
+    throw new Error('Content must be non-empty');
+  }
+
+  if (input.sourceUrl !== undefined && input.sourceUrl && input.sourceUrl.trim()) {
+    try {
+      new URL(input.sourceUrl.trim());
+    } catch {
+      throw new Error('Source URL must be a valid URL');
+    }
+  }
+
+  if (input.reviewInterval === 'custom' && (!input.customDays || input.customDays <= 0)) {
+    throw new Error('Custom days must be greater than 0 when review interval is custom');
+  }
+
   if (input.collectionId && input.collectionId !== note.collectionId) {
     const collection = await db.collection.findUnique({
       where: { id: input.collectionId },
@@ -282,13 +316,14 @@ export async function updateNote(userId: string, noteId: string, input: UpdateNo
     }
   }
 
-  const reviewInterval = input.reviewInterval || note.reviewInterval;
+  const reviewInterval = input.reviewInterval !== undefined ? input.reviewInterval : note.reviewInterval;
   let nextReviewDate = note.nextReviewDate;
 
+  // Only recalculate review date if review interval or custom days changed
   if (input.reviewInterval !== undefined || input.customDays !== undefined) {
     nextReviewDate = calculateNextReviewDate(
       reviewInterval as ReviewInterval,
-      input.customDays || note.customDays
+      input.customDays !== undefined ? input.customDays : note.customDays
     );
   }
 

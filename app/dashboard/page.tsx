@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Box, Button, Paper, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions, Fab } from '@mui/material';
+import { Box, Button, Paper, Stack, Typography, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material';
 import { Add, Refresh } from '@mui/icons-material';
 import axios from 'axios';
 import { toast } from 'sonner';
@@ -268,22 +268,6 @@ export default function DashboardPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Floating Action Button */}
-      {collections.length > 0 && (
-        <Fab
-          color="primary"
-          aria-label="add"
-          onClick={handleCreateNote}
-          sx={{
-            position: 'fixed',
-            bottom: 24,
-            right: 24,
-            zIndex: 1000,
-          }}
-        >
-          <Add />
-        </Fab>
-      )}
     </Box>
   );
 }

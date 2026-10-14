@@ -2,6 +2,7 @@
 
 import { Grid, Box, CircularProgress, Button, Stack } from '@mui/material';
 import { useState, forwardRef, useImperativeHandle, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import useSWR from 'swr';
 import axios from 'axios';
 import { NoteCard } from './NoteCard';
@@ -57,6 +58,7 @@ export const NoteList = forwardRef(function NoteList(
   }: NoteListProps,
   ref: any
 ) {
+  const router = useRouter();
   const [search, setSearch] = useState('');
   const [selectedCollection, setSelectedCollection] = useState(initialCollection || '');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
@@ -123,6 +125,11 @@ export const NoteList = forwardRef(function NoteList(
         onCollectionChange={(value) => {
           setSelectedCollection(value);
           setPage(0);
+          if (value) {
+            router.push(`/dashboard?collection=${value}`);
+          } else {
+            router.push('/dashboard');
+          }
         }}
         onTagsChange={(value) => {
           setSelectedTags(value);

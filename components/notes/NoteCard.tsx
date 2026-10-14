@@ -271,7 +271,35 @@ export function NoteCard({
               )}
             </Stack>
           )}
-          {allTags.length > 0 && (
+          {allTags.length > 0 && tags.length === 0 && (
+            <Box
+              onClick={handleTagsDialogOpen}
+              sx={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+                px: 1.5,
+                py: 0.5,
+                borderRadius: '16px',
+                backgroundColor: 'rgba(156, 39, 176, 0.08)',
+                border: '1px solid #9c27b0',
+                color: '#7b1fa2',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+                fontWeight: 500,
+                transition: 'all 0.2s ease',
+                ml: 'auto',
+                '&:hover': {
+                  backgroundColor: 'rgba(156, 39, 176, 0.12)',
+                },
+              }}
+              title="Add tags"
+            >
+              <AddIcon sx={{ fontSize: '1rem' }} />
+              <LocalOffer sx={{ fontSize: '1rem' }} />
+            </Box>
+          )}
+          {allTags.length > 0 && tags.length > 0 && (
             <IconButton
               size="small"
               onClick={handleTagsDialogOpen}
@@ -433,12 +461,13 @@ export function NoteCard({
         <DialogContent sx={{ pt: 2 }}>
           <Autocomplete
             multiple
-            options={allTags}
+            options={allTags.filter((tag) => !selectedTags.some((st) => st.id === tag.id))}
             getOptionLabel={(tag: Tag) => tag.name}
             value={selectedTags}
             onChange={(event, newValue) => {
               setSelectedTags(newValue);
             }}
+            noOptionsText="All available tags are already selected"
             renderInput={(params) => (
               <TextField
                 {...params}

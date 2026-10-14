@@ -159,9 +159,8 @@ export default function TagsPage() {
               Delete Tag "{selectedTag.name}"?
             </Typography>
             <Typography variant="body2" color="textSecondary" sx={{ mb: 3 }}>
-              This tag will be removed from all {selectedTag.noteCount}{' '}
-              note{selectedTag.noteCount !== 1 ? 's' : ''} it's assigned to. The notes
-              will not be deleted.
+              This tag will be removed from {selectedTag.noteCount}{' '}
+              note{selectedTag.noteCount !== 1 ? 's' : ''}. The notes themselves will not be deleted.
             </Typography>
             <Box sx={{ display: 'flex', gap: 1, justifyContent: 'flex-end' }}>
               <Button

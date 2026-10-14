@@ -4,14 +4,17 @@ import { listNotes, createNote } from '@/lib/services/notes';
 import { z } from 'zod';
 
 const CreateNoteSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(500),
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters'),
   content: z.string().min(1, 'Content is required'),
   collectionId: z.string().min(1, 'Collection ID is required'),
-  sourceUrl: z.string().url().optional().or(z.literal('')),
+  sourceUrl: z.string().url('Source URL must be a valid URL').optional().or(z.literal('')),
   reviewInterval: z.enum(['none', 'daily', 'weekly', 'monthly', 'custom']).optional(),
-  customDays: z.number().int().positive().optional(),
+  customDays: z.number().int('Custom days must be an integer').positive('Custom days must be greater than 0').optional(),
   tagIds: z.array(z.string()).optional(),
-});
+}).refine(
+  (data) => data.reviewInterval !== 'custom' || (data.customDays && data.customDays > 0),
+  { message: 'Custom days must be greater than 0 when review interval is custom', path: ['customDays'] }
+);
 
 export async function GET(request: NextRequest) {
   try {

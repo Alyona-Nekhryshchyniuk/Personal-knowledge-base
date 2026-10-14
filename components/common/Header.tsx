@@ -1,14 +1,21 @@
 'use client';
 
-import { AppBar, Toolbar, Box, Avatar, IconButton, Menu, MenuItem, Typography } from '@mui/material';
+import { AppBar, Toolbar, Box, Avatar, IconButton, Menu, MenuItem, Typography, useMediaQuery, useTheme } from '@mui/material';
 import { signOut, useSession } from 'next-auth/react';
 import { useState } from 'react';
 import LogoutIcon from '@mui/icons-material/Logout';
+import MenuIcon from '@mui/icons-material/Menu';
 import { NotificationBadge } from '@/components/notifications';
 
-export function Header() {
+interface HeaderProps {
+  onMenuOpen?: () => void;
+}
+
+export function Header({ onMenuOpen }: HeaderProps) {
   const { data: session } = useSession();
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
     setAnchorEl(event.currentTarget);
@@ -26,15 +33,28 @@ export function Header() {
   return (
     <AppBar position="static" sx={{ backgroundColor: '#fff', color: '#000', boxShadow: 1 }}>
       <Toolbar sx={{ justifyContent: 'space-between' }}>
-        <Typography
-          variant="h6"
-          sx={{
-            fontWeight: 'bold',
-            color: '#1976d2',
-          }}
-        >
-          Knowledge Base
-        </Typography>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          {isMobile && (
+            <IconButton
+              onClick={onMenuOpen}
+              size="small"
+              sx={{
+                color: '#000',
+              }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+          <Typography
+            variant="h6"
+            sx={{
+              fontWeight: 'bold',
+              color: '#1976d2',
+            }}
+          >
+            Knowledge Base
+          </Typography>
+        </Box>
 
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
           {session?.user && (

@@ -4,14 +4,17 @@ import { getNote, updateNote, deleteNote } from '@/lib/services/notes';
 import { z } from 'zod';
 
 const UpdateNoteSchema = z.object({
-  title: z.string().min(1, 'Title is required').max(500).optional(),
+  title: z.string().min(1, 'Title is required').max(500, 'Title must not exceed 500 characters').optional(),
   content: z.string().min(1, 'Content is required').optional(),
-  collectionId: z.string().min(1, 'Collection ID is required').optional(),
-  sourceUrl: z.string().url().optional().or(z.literal('')),
+  collectionId: z.string().cuid().optional(),
+  sourceUrl: z.string().url('Source URL must be a valid URL').optional().or(z.literal('')).or(z.null()),
   reviewInterval: z.enum(['none', 'daily', 'weekly', 'monthly', 'custom']).optional(),
-  customDays: z.number().int().positive().optional(),
-  tagIds: z.array(z.string()).optional(),
-});
+  customDays: z.number().int('Custom days must be an integer').positive('Custom days must be greater than 0').optional().or(z.null()),
+  tagIds: z.array(z.string().cuid()).optional(),
+}).refine(
+  (data) => !data.reviewInterval || data.reviewInterval !== 'custom' || (data.customDays && data.customDays > 0),
+  { message: 'Custom days must be greater than 0 when review interval is custom', path: ['customDays'] }
+);
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {

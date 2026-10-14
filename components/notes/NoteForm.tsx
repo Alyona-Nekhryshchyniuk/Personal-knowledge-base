@@ -238,26 +238,32 @@ export function NoteForm({ open, onClose, mode, initialData, onSuccess, defaultC
           <Controller
             name="tagIds"
             control={control}
-            render={({ field: { value, onChange } }) => (
-              <Autocomplete
-                multiple
-                options={tags}
-                getOptionLabel={(tag: Tag) => tag.name}
-                value={tags.filter((tag: Tag) => value?.includes(tag.id)) || []}
-                onChange={(event, newValue) => {
-                  onChange(newValue.map((tag: Tag) => tag.id));
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Tags (optional)"
-                    placeholder="Search or select tags..."
-                    sx={{ mt: 2 }}
-                  />
-                )}
-                disabled={loading}
-              />
-            )}
+            render={({ field: { value, onChange } }) => {
+              const selectedTagIds = value || [];
+              const availableTags = tags.filter((tag: Tag) => !selectedTagIds.includes(tag.id));
+              const selectedTags = tags.filter((tag: Tag) => selectedTagIds.includes(tag.id));
+
+              return (
+                <Autocomplete
+                  multiple
+                  options={availableTags}
+                  getOptionLabel={(tag: Tag) => tag.name}
+                  value={selectedTags}
+                  onChange={(event, newValue) => {
+                    onChange(newValue.map((tag: Tag) => tag.id));
+                  }}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      label="Tags (optional)"
+                      placeholder="Search or select tags..."
+                      sx={{ mt: 2 }}
+                    />
+                  )}
+                  disabled={loading}
+                />
+              );
+            }}
           />
 
           <Controller
