@@ -10,6 +10,7 @@ const UpdateNoteSchema = z.object({
   sourceUrl: z.string().url().optional().or(z.literal('')),
   reviewInterval: z.enum(['none', 'daily', 'weekly', 'monthly', 'custom']).optional(),
   customDays: z.number().int().positive().optional(),
+  tagIds: z.array(z.string()).optional(),
 });
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {

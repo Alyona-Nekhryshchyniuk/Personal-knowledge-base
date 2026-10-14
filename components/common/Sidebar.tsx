@@ -17,7 +17,7 @@ import AddIcon from '@mui/icons-material/Add';
 import FolderIcon from '@mui/icons-material/Folder';
 import LocalOfferIcon from '@mui/icons-material/LocalOffer';
 import { useEffect, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter, usePathname, useSearchParams } from 'next/navigation';
 import axios from 'axios';
 
 interface Collection {
@@ -33,6 +33,8 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const router = useRouter();
   const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const activeCollectionId = searchParams.get('collection');
 
   useEffect(() => {
     fetchCollections();
@@ -99,32 +101,53 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
         >
           Management
         </Typography>
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={handleNewCollection}
+        <Box
           sx={{
-            textTransform: 'none',
-            fontSize: '0.9rem',
-            mb: 1,
-          }}
-        >
-          New Collection
-        </Button>
-        <Button
-          fullWidth
-          variant="outlined"
-          startIcon={<AddIcon />}
-          onClick={handleNewTag}
-          sx={{
-            textTransform: 'none',
-            fontSize: '0.9rem',
+            display: 'flex',
+            gap: 1,
+            borderBottom: '1px solid #e0e0e0',
             mb: 2,
           }}
         >
-          New Tag
-        </Button>
+          <Button
+            variant="text"
+            startIcon={<AddIcon />}
+            onClick={handleNewCollection}
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.9rem',
+              flex: 1,
+              py: 1.5,
+              borderBottom: '2px solid transparent',
+              borderRadius: 0,
+              color: 'text.primary',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
+            }}
+          >
+            Collection
+          </Button>
+          <Button
+            variant="text"
+            startIcon={<AddIcon />}
+            onClick={handleNewTag}
+            sx={{
+              textTransform: 'none',
+              fontSize: '0.9rem',
+              flex: 1,
+              py: 1.5,
+              borderBottom: '2px solid transparent',
+              borderRadius: 0,
+              color: 'text.primary',
+              '&:hover': {
+                backgroundColor: 'rgba(0, 0, 0, 0.04)',
+              },
+            }}
+          >
+            Tag
+          </Button>
+        </Box>
       </Box>
 
       <Typography
@@ -160,7 +183,9 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
               />
             </ListItem>
           ) : (
-            collections.map((collection) => (
+            collections.map((collection) => {
+              const isActive = activeCollectionId === collection.id;
+              return (
               <ListItemButton
                 key={collection.id}
                 onClick={() => handleCollectionClick(collection.id)}
@@ -172,6 +197,7 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
                   display: 'flex',
                   alignItems: 'center',
                   gap: 1,
+                  backgroundColor: isActive ? 'rgba(25, 118, 210, 0.12)' : 'transparent',
                   '&:hover': {
                     backgroundColor: 'rgba(25, 118, 210, 0.08)',
                   },
@@ -203,7 +229,8 @@ export function Sidebar({ open, onClose }: { open?: boolean; onClose?: () => voi
                   }}
                 />
               </ListItemButton>
-            ))
+            );
+            })
           )}
         </List>
       </Box>

@@ -156,10 +156,16 @@ export const NoteList = forwardRef(function NoteList(
               <Grid item xs={12} sm={6} md={4} key={note.id}>
                 <NoteCard
                   {...note}
+                  collections={collections}
+                  allTags={tags}
                   onEdit={onEdit}
                   onDelete={onDelete}
                   onArchive={onArchive}
                   onRestore={onRestore}
+                  onMove={() => mutate()}
+                  onTagsUpdate={async () => {
+                    await mutate();
+                  }}
                 />
               </Grid>
             ))}

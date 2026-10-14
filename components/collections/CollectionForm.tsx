@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -36,6 +36,7 @@ export function CollectionForm({
 }: CollectionFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -54,6 +55,9 @@ export function CollectionForm({
       reset({
         name: initialValues?.name || '',
       });
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   }, [open, initialValues, reset]);
 
@@ -106,6 +110,7 @@ export function CollectionForm({
             </Alert>
           )}
           <TextField
+            inputRef={inputRef}
             fullWidth
             label="Collection Name"
             placeholder="e.g., Learning, Projects, Ideas"
@@ -113,7 +118,6 @@ export function CollectionForm({
             error={!!errors.name}
             helperText={errors.name?.message}
             disabled={loading}
-            autoFocus
           />
         </DialogContent>
         <DialogActions>

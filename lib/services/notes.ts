@@ -19,6 +19,7 @@ export interface UpdateNoteInput {
   collectionId?: string;
   reviewInterval?: ReviewInterval;
   customDays?: number;
+  tagIds?: string[];
 }
 
 export interface NoteFilters {
@@ -54,9 +55,9 @@ export async function listNotes(
 
   if (filters?.search) {
     where.OR = [
-      { title: { contains: filters.search, mode: 'insensitive' } },
-      { content: { contains: filters.search, mode: 'insensitive' } },
-      { sourceUrl: { contains: filters.search, mode: 'insensitive' } },
+      { title: { contains: filters.search } },
+      { content: { contains: filters.search } },
+      { sourceUrl: { contains: filters.search } },
     ];
   }
 
@@ -291,6 +292,17 @@ export async function updateNote(userId: string, noteId: string, input: UpdateNo
     );
   }
 
+  // Validate tags if provided
+  if (input.tagIds !== undefined && input.tagIds.length > 0) {
+    const tags = await db.tag.findMany({
+      where: { id: { in: input.tagIds }, userId },
+    });
+
+    if (tags.length !== input.tagIds.length) {
+      throw new Error('Some tags not found or not owned by user');
+    }
+  }
+
   const updated = await db.note.update({
     where: { id: noteId },
     data: {
@@ -301,6 +313,14 @@ export async function updateNote(userId: string, noteId: string, input: UpdateNo
       reviewInterval,
       customDays: input.customDays !== undefined ? input.customDays : note.customDays,
       nextReviewDate,
+      ...(input.tagIds !== undefined && {
+        tags: {
+          deleteMany: {},
+          create: input.tagIds.map((tagId) => ({
+            tagId,
+          })),
+        },
+      }),
     },
     include: {
       collection: { select: { id: true, name: true } },

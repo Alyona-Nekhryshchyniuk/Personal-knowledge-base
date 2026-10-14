@@ -12,7 +12,7 @@ import {
   Autocomplete,
 } from '@mui/material';
 import { FilterAlt, Clear } from '@mui/icons-material';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Collection {
   id: string;
@@ -58,6 +58,24 @@ export function FilterControls({
   loading = false,
 }: FilterControlsProps) {
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [localSearch, setLocalSearch] = useState(search);
+  const debounceTimerRef = useRef<NodeJS.Timeout>();
+
+  useEffect(() => {
+    setLocalSearch(search);
+  }, [search]);
+
+  const handleSearchChange = (value: string) => {
+    setLocalSearch(value);
+
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    debounceTimerRef.current = setTimeout(() => {
+      onSearchChange?.(value);
+    }, 700);
+  };
 
   const activeFiltersCount = [
     search ? 1 : 0,
@@ -75,8 +93,8 @@ export function FilterControls({
       <Paper elevation={0} sx={{ p: 2, mb: 2, backgroundColor: '#f5f5f5' }}>
         <TextField
           placeholder="Search notes by title, content, or URL..."
-          value={search}
-          onChange={(e) => onSearchChange?.(e.target.value)}
+          value={localSearch}
+          onChange={(e) => handleSearchChange(e.target.value)}
           fullWidth
           size="small"
           disabled={loading}

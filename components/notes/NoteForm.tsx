@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useForm, Controller } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import {
@@ -57,6 +57,7 @@ const fetcher = (url: string) => axios.get(url).then((r) => r.data);
 
 export function NoteForm({ open, onClose, mode, initialData, onSuccess, defaultCollectionId }: NoteFormProps) {
   const [loading, setLoading] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
   const { data: { collections = [] } = {} } = useSWR('/api/collections', fetcher);
   const { data: { tags = [] } = {} } = useSWR('/api/tags', fetcher);
 
@@ -100,6 +101,9 @@ export function NoteForm({ open, onClose, mode, initialData, onSuccess, defaultC
         customDays: initialData?.customDays,
         tagIds: initialData?.tagIds || [],
       });
+      setTimeout(() => {
+        titleInputRef.current?.focus();
+      }, 100);
     }
   }, [open, initialData, defaultCollectionId, reset]);
 
@@ -151,14 +155,22 @@ export function NoteForm({ open, onClose, mode, initialData, onSuccess, defaultC
             render={({ field }) => (
               <TextField
                 {...field}
+                inputRef={titleInputRef}
                 label="Title *"
                 fullWidth
                 placeholder="e.g., React Hooks Best Practices"
                 error={!!errors.title}
                 helperText={errors.title?.message || ''}
                 disabled={loading}
-                autoFocus
                 inputProps={{ maxLength: 500 }}
+                variant="outlined"
+                sx={{
+                  mt: 1.25,
+                  '& .MuiInputLabel-outlined': {
+                    backgroundColor: 'white',
+                    px: 0.5,
+                  },
+                }}
               />
             )}
           />
@@ -240,6 +252,7 @@ export function NoteForm({ open, onClose, mode, initialData, onSuccess, defaultC
                     {...params}
                     label="Tags (optional)"
                     placeholder="Search or select tags..."
+                    sx={{ mt: 2 }}
                   />
                 )}
                 disabled={loading}

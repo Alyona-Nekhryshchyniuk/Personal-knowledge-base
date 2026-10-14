@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Button,
@@ -36,6 +36,7 @@ export function TagForm({
 }: TagFormProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const {
     register,
@@ -55,6 +56,9 @@ export function TagForm({
         name: initialValues?.name || '',
       });
       setError(null);
+      setTimeout(() => {
+        inputRef.current?.focus();
+      }, 100);
     }
   }, [open, initialValues, reset]);
 
@@ -105,6 +109,7 @@ export function TagForm({
             </Alert>
           )}
           <TextField
+            inputRef={inputRef}
             fullWidth
             label="Tag Name"
             placeholder="e.g., important, review-soon, archived"
@@ -112,7 +117,6 @@ export function TagForm({
             error={!!errors.name}
             helperText={errors.name?.message}
             disabled={loading}
-            autoFocus
           />
         </DialogContent>
         <DialogActions>
