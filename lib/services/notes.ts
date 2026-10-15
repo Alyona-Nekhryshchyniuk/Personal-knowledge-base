@@ -524,12 +524,14 @@ export async function markAsReviewed(userId: string, noteId: string) {
     note.reviewInterval as ReviewInterval,
     note.customDays
   );
+  const originalUpdatedAt = note.updatedAt;
 
   const reviewed = await db.note.update({
     where: { id: noteId },
     data: {
       lastReviewedDate: today,
       nextReviewDate,
+      updatedAt: originalUpdatedAt,
     },
     include: {
       collection: { select: { id: true, name: true } },

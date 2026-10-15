@@ -20,7 +20,7 @@ import {
   Autocomplete,
   TextField,
 } from '@mui/material';
-import { Edit, Delete, Archive, Unarchive, LocalOffer, MoreVert, Add as AddIcon } from '@mui/icons-material';
+import { Edit, Delete, Archive, Unarchive, LocalOffer, MoreVert, Add as AddIcon, CheckCircle } from '@mui/icons-material';
 import { ReviewBadge } from './ReviewBadge';
 import { useState } from 'react';
 import axios from 'axios';
@@ -57,6 +57,7 @@ interface NoteCardProps {
   onRestore?: (id: string) => void;
   onMove?: (noteId: string, collectionId: string) => void | Promise<void>;
   onTagsUpdate?: () => void | Promise<void>;
+  onReview?: () => void | Promise<void>;
 }
 
 export function NoteCard({
@@ -80,6 +81,7 @@ export function NoteCard({
   onRestore,
   onMove,
   onTagsUpdate,
+  onReview,
 }: NoteCardProps) {
   const [menuAnchor, setMenuAnchor] = useState<null | HTMLElement>(null);
   const [moveDialogOpen, setMoveDialogOpen] = useState(false);
@@ -88,6 +90,7 @@ export function NoteCard({
   const [tagsDialogOpen, setTagsDialogOpen] = useState(false);
   const [selectedTags, setSelectedTags] = useState<Tag[]>(tags);
   const [isUpdatingTags, setIsUpdatingTags] = useState(false);
+  const [isMarking, setIsMarking] = useState(false);
 
   const formatDate = (date?: Date | string | null) => {
     if (!date) return null;
@@ -190,6 +193,22 @@ export function NoteCard({
       toast.error(message);
     }
   };
+
+  const handleMarkAsReviewed = async () => {
+    setIsMarking(true);
+    try {
+      const response = await axios.post(`/api/notes/${id}/review`);
+      toast.success('Note marked as reviewed');
+      await onReview?.();
+    } catch (error) {
+      const message = axios.isAxiosError(error)
+        ? error.response?.data?.error || error.message
+        : 'Failed to mark note as reviewed';
+      toast.error(message);
+    } finally {
+      setIsMarking(false);
+    }
+  };
   return (
     <Card
       sx={{
@@ -197,6 +216,7 @@ export function NoteCard({
         display: 'flex',
         flexDirection: 'column',
         transition: 'all 0.2s ease',
+        background: 'linear-gradient(135deg, rgba(156, 39, 176, 0.04) 0%, rgba(233, 30, 99, 0.04) 100%)',
         '&:hover': {
           boxShadow: 4,
           transform: 'translateY(-2px)',
@@ -352,6 +372,18 @@ export function NoteCard({
             color="primary"
           >
             <Edit fontSize="small" />
+          </IconButton>
+        )}
+
+        {status === 'Active' && reviewInterval && reviewInterval !== 'none' && onReview && (
+          <IconButton
+            size="small"
+            onClick={handleMarkAsReviewed}
+            disabled={isMarking}
+            title="Mark as reviewed"
+            color="success"
+          >
+            {isMarking ? <CircularProgress size={20} /> : <CheckCircle fontSize="small" />}
           </IconButton>
         )}
 

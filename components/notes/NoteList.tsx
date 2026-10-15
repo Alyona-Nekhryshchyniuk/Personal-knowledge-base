@@ -85,7 +85,10 @@ export const NoteList = forwardRef(function NoteList(
   params.append('skip', String(page * pageSize));
   params.append('take', String(pageSize + 1));
 
-  const { data, isLoading, mutate } = useSWR(`/api/notes?${params.toString()}`, fetcher);
+  const { data, isLoading, mutate } = useSWR(`/api/notes?${params.toString()}`, fetcher, {
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+  });
 
   const allNotes = data?.notes || [];
   const hasNextPage = allNotes.length > pageSize;
@@ -172,6 +175,9 @@ export const NoteList = forwardRef(function NoteList(
                   onMove={() => mutate()}
                   onTagsUpdate={async () => {
                     await mutate();
+                  }}
+                  onReview={async () => {
+                    mutate(undefined, { revalidate: true });
                   }}
                 />
               </Grid>
